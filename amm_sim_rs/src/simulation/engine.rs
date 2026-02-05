@@ -108,10 +108,10 @@ impl SimulationEngine {
             (amm_baseline.reserves().0, amm_baseline.reserves().1),
         );
 
-        // Track instantaneous markouts per strategy
-        let mut markouts: HashMap<String, f64> = HashMap::new();
-        markouts.insert(submission_name.clone(), 0.0);
-        markouts.insert(baseline_name.clone(), 0.0);
+        // Track edge per strategy
+        let mut edges: HashMap<String, f64> = HashMap::new();
+        edges.insert(submission_name.clone(), 0.0);
+        edges.insert(baseline_name.clone(), 0.0);
 
         // Run simulation steps
         let mut steps = Vec::with_capacity(self.config.n_steps as usize);
@@ -141,8 +141,8 @@ impl SimulationEngine {
             for amm in amms.iter_mut() {
                 if let Some(arb_result) = arbitrageur.execute_arb(amm, fair_price, t as u64) {
                     *arb_volume_y.get_mut(&arb_result.amm_name).unwrap() += arb_result.amount_y;
-                    let entry = markouts.entry(arb_result.amm_name).or_insert(0.0);
-                    // AMM markout is the negative of arbitrageur profit at true price
+                    let entry = edges.entry(arb_result.amm_name).or_insert(0.0);
+                    // AMM edge is the negative of arbitrageur profit at true price
                     *entry += -arb_result.profit;
                 }
             }
@@ -152,13 +152,13 @@ impl SimulationEngine {
             let routed_trades = router.route_orders(&orders, &mut amms, fair_price, t as u64);
             for trade in routed_trades {
                 *retail_volume_y.get_mut(&trade.amm_name).unwrap() += trade.amount_y;
-                let trade_markout = if trade.amm_buys_x {
+                let trade_edge = if trade.amm_buys_x {
                     trade.amount_x * fair_price - trade.amount_y
                 } else {
                     trade.amount_y - trade.amount_x * fair_price
                 };
-                let entry = markouts.entry(trade.amm_name).or_insert(0.0);
-                *entry += trade_markout;
+                let entry = edges.entry(trade.amm_name).or_insert(0.0);
+                *entry += trade_edge;
             }
 
             // 4. Capture step result and accumulate fees
@@ -208,7 +208,7 @@ impl SimulationEngine {
             seed,
             strategies: vec![submission_name, baseline_name],
             pnl,
-            instantaneous_markouts: markouts,
+            edges,
             initial_fair_price,
             initial_reserves,
             steps,

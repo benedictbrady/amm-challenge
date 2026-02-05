@@ -41,7 +41,7 @@ class LightweightSimResult:
     seed: int
     strategies: list[str]
     pnl: dict[str, Decimal]
-    instantaneous_markouts: dict[str, Decimal]
+    edges: dict[str, Decimal]
     initial_fair_price: float
     initial_reserves: dict[str, tuple[float, float]]
     steps: list[LightweightStepResult]
@@ -60,8 +60,8 @@ class MatchResult:
     draws: int
     total_pnl_a: Decimal
     total_pnl_b: Decimal
-    total_im_a: Decimal
-    total_im_b: Decimal
+    total_edge_a: Decimal
+    total_edge_b: Decimal
     simulation_results: list[LightweightSimResult] = field(default_factory=list)
 
     @property
@@ -165,25 +165,25 @@ class MatchRunner:
         draws = 0
         total_pnl_a = Decimal("0")
         total_pnl_b = Decimal("0")
-        total_im_a = Decimal("0")
-        total_im_b = Decimal("0")
+        total_edge_a = Decimal("0")
+        total_edge_b = Decimal("0")
         simulation_results = []
 
         for rust_result in batch_result.results:
             # Get PnL values using fixed positional keys from Rust
             pnl_a = rust_result.pnl.get("submission", 0.0)
             pnl_b = rust_result.pnl.get("normalizer", 0.0)
-            im_a = rust_result.instantaneous_markouts.get("submission", 0.0)
-            im_b = rust_result.instantaneous_markouts.get("normalizer", 0.0)
+            edge_a = rust_result.edges.get("submission", 0.0)
+            edge_b = rust_result.edges.get("normalizer", 0.0)
 
             total_pnl_a += Decimal(str(pnl_a))
             total_pnl_b += Decimal(str(pnl_b))
-            total_im_a += Decimal(str(im_a))
-            total_im_b += Decimal(str(im_b))
+            total_edge_a += Decimal(str(edge_a))
+            total_edge_b += Decimal(str(edge_b))
 
-            if im_a > im_b:
+            if edge_a > edge_b:
                 wins_a += 1
-            elif im_b > im_a:
+            elif edge_b > edge_a:
                 wins_b += 1
             else:
                 draws += 1
@@ -205,8 +205,8 @@ class MatchRunner:
                     seed=rust_result.seed,
                     strategies=rust_result.strategies,
                     pnl={k: Decimal(str(v)) for k, v in rust_result.pnl.items()},
-                    instantaneous_markouts={
-                        k: Decimal(str(v)) for k, v in rust_result.instantaneous_markouts.items()
+                    edges={
+                        k: Decimal(str(v)) for k, v in rust_result.edges.items()
                     },
                     initial_fair_price=rust_result.initial_fair_price,
                     initial_reserves=rust_result.initial_reserves,
@@ -225,7 +225,7 @@ class MatchRunner:
             draws=draws,
             total_pnl_a=total_pnl_a,
             total_pnl_b=total_pnl_b,
-            total_im_a=total_im_a,
-            total_im_b=total_im_b,
+            total_edge_a=total_edge_a,
+            total_edge_b=total_edge_b,
             simulation_results=simulation_results,
         )

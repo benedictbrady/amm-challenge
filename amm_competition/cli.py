@@ -122,9 +122,9 @@ def run_match_command(args: argparse.Namespace) -> int:
     )
     result = runner.run_match(user_strategy, default_strategy)
 
-    # Display score (only the user's strategy IM)
-    avg_im = result.total_im_a / n_simulations
-    print(f"\n{strategy_name} IM: {avg_im:.2f}")
+    # Display score (only the user's strategy Edge)
+    avg_edge = result.total_edge_a / n_simulations
+    print(f"\n{strategy_name} Edge: {avg_edge:.2f}")
 
     return 0
 
@@ -193,7 +193,7 @@ Examples:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # Run command
-    run_parser = subparsers.add_parser("run", help="Run simulations and get your strategy's IM score")
+    run_parser = subparsers.add_parser("run", help="Run simulations and get your strategy's Edge score")
     run_parser.add_argument("strategy", help="Path to Solidity strategy file (.sol)")
     run_parser.add_argument(
         "--simulations",

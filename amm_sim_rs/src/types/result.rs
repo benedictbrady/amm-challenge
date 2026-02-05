@@ -54,9 +54,9 @@ pub struct LightweightSimResult {
     #[pyo3(get)]
     pub pnl: HashMap<String, f64>,
 
-    /// Instantaneous markouts by strategy name (sum over trades)
+    /// Edge by strategy name (sum over trades)
     #[pyo3(get)]
-    pub instantaneous_markouts: HashMap<String, f64>,
+    pub edges: HashMap<String, f64>,
 
     /// Initial fair price
     #[pyo3(get)]
@@ -94,20 +94,20 @@ impl LightweightSimResult {
 
         let pnl_a = self.pnl.get(names[0]).copied().unwrap_or(0.0);
         let pnl_b = self.pnl.get(names[1]).copied().unwrap_or(0.0);
-        let im_a = self
-            .instantaneous_markouts
+        let edge_a = self
+            .edges
             .get(names[0])
             .copied()
             .unwrap_or(pnl_a);
-        let im_b = self
-            .instantaneous_markouts
+        let edge_b = self
+            .edges
             .get(names[1])
             .copied()
             .unwrap_or(pnl_b);
 
-        if im_a > im_b {
+        if edge_a > edge_b {
             Some(names[0].clone())
-        } else if im_b > im_a {
+        } else if edge_b > edge_a {
             Some(names[1].clone())
         } else {
             None // Draw
@@ -153,20 +153,20 @@ impl BatchSimulationResult {
         for result in &self.results {
             let pnl_a = result.pnl.get(name_a).copied().unwrap_or(0.0);
             let pnl_b = result.pnl.get(name_b).copied().unwrap_or(0.0);
-            let im_a = result
-                .instantaneous_markouts
+            let edge_a = result
+                .edges
                 .get(name_a)
                 .copied()
                 .unwrap_or(pnl_a);
-            let im_b = result
-                .instantaneous_markouts
+            let edge_b = result
+                .edges
                 .get(name_b)
                 .copied()
                 .unwrap_or(pnl_b);
 
-            if im_a > im_b {
+            if edge_a > edge_b {
                 wins_a += 1;
-            } else if im_b > im_a {
+            } else if edge_b > edge_a {
                 wins_b += 1;
             } else {
                 draws += 1;

@@ -1,6 +1,6 @@
 # AMM Fee Strategy Challenge
 
-Design dynamic fee strategies for a constant-product AMM. Your goal: maximize **Instantaneous Markout (IM)**.
+Design dynamic fee strategies for a constant-product AMM. Your goal: maximize **edge**.
 
 ## Submission
 
@@ -55,7 +55,7 @@ When spot price diverges from fair price `p`, arbitrageurs trade to close the ga
 - **Spot < fair** (AMM underprices X): Buy X from AMM. Optimal size: `Δx = x - √(k(1+f)/p)`
 - **Spot > fair** (AMM overprices X): Sell X to AMM. Optimal size: `Δx = √(k(1-f)/p) - x`
 
-Higher fees mean arbitrageurs need larger mispricings to profit, so your AMM stays "stale" longer—bad for IM.
+Higher fees mean arbitrageurs need larger mispricings to profit, so your AMM stays "stale" longer—bad for edge.
 
 ### Order Routing
 
@@ -67,19 +67,19 @@ Retail orders split optimally across AMMs to equalize marginal prices post-trade
 
 Lower fees → larger `γ` → more flow. But the relationship is nonlinear—small fee differences can shift large fractions of volume.
 
-### Instantaneous Markout
+### Edge
 
-IM measures profitability using the fair price at trade time:
+Edge measures profitability using the fair price at trade time:
 
 ```
-IM = Σ (amount_x × fair_price - amount_y)   for sells (AMM sells X)
-   + Σ (amount_y - amount_x × fair_price)   for buys  (AMM buys X)
+Edge = Σ (amount_x × fair_price - amount_y)   for sells (AMM sells X)
+     + Σ (amount_y - amount_x × fair_price)   for buys  (AMM buys X)
 ```
 
-- **Retail trades**: Positive IM (you profit from the spread)
-- **Arbitrage trades**: Negative IM (you lose to informed flow)
+- **Retail trades**: Positive edge (you profit from the spread)
+- **Arbitrage trades**: Negative edge (you lose to informed flow)
 
-Good strategies maximize retail IM while minimizing arb losses.
+Good strategies maximize retail edge while minimizing arb losses.
 
 ## Why the Normalizer?
 
@@ -136,4 +136,4 @@ amm-match run my_strategy.sol --simulations 10
 amm-match validate my_strategy.sol
 ```
 
-Output is your average IM across simulations. The 25 bps normalizer typically scores around 250-350 IM depending on market conditions.
+Output is your average edge across simulations. The 25 bps normalizer typically scores around 250-350 edge depending on market conditions.
