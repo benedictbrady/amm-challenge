@@ -21,13 +21,13 @@ interface IAMMStrategy {
     /// @param initialY Starting Y reserve amount (WAD precision)
     /// @return bidFee Fee when AMM buys X (WAD precision, e.g., 30e14 = 30bps)
     /// @return askFee Fee when AMM sells X (WAD precision, e.g., 30e14 = 30bps)
-    function initialize(uint256 initialX, uint256 initialY) external returns (uint256 bidFee, uint256 askFee);
+    function afterInitialize(uint256 initialX, uint256 initialY) external returns (uint256 bidFee, uint256 askFee);
 
     /// @notice Called after each trade to update fees
     /// @param trade Information about the just-executed trade
     /// @return bidFee Updated fee when AMM buys X (WAD precision)
     /// @return askFee Updated fee when AMM sells X (WAD precision)
-    function onTrade(TradeInfo calldata trade) external returns (uint256 bidFee, uint256 askFee);
+    function afterSwap(TradeInfo calldata trade) external returns (uint256 bidFee, uint256 askFee);
 
     /// @notice Get the strategy name for display
     /// @return Strategy name string

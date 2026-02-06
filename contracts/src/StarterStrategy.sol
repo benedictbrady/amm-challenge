@@ -9,11 +9,11 @@ import {IAMMStrategy, TradeInfo} from "./IAMMStrategy.sol";
 contract Strategy is AMMStrategyBase {
     uint256 public constant FEE = 50 * BPS;
 
-    function initialize(uint256, uint256) external pure override returns (uint256, uint256) {
+    function afterInitialize(uint256, uint256) external pure override returns (uint256, uint256) {
         return (FEE, FEE);
     }
 
-    function onTrade(TradeInfo calldata) external pure override returns (uint256, uint256) {
+    function afterSwap(TradeInfo calldata) external pure override returns (uint256, uint256) {
         return (FEE, FEE);
     }
 

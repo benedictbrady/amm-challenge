@@ -21,11 +21,11 @@ class TestGetVanillaBytecodeAndAbi:
         assert len(bytecode) > 0
 
     def test_abi_contains_required_functions(self, vanilla_bytecode_and_abi):
-        """Verify ABI contains initialize, onTrade, and getName."""
+        """Verify ABI contains afterInitialize, afterSwap, and getName."""
         bytecode, abi = vanilla_bytecode_and_abi
         function_names = {item.get("name") for item in abi if item.get("type") == "function"}
-        assert "initialize" in function_names
-        assert "onTrade" in function_names
+        assert "afterInitialize" in function_names
+        assert "afterSwap" in function_names
         assert "getName" in function_names
 
     def test_caching_returns_same_objects(self):
@@ -49,16 +49,16 @@ class TestLoadVanillaStrategy:
         assert strategy.get_name() == "Vanilla_30bps"
 
     def test_strategy_fees_correct(self):
-        """Verify initialize returns 30 bps fees."""
+        """Verify afterInitialize returns 30 bps fees."""
         strategy = load_vanilla_strategy()
-        fees = strategy.initialize(Decimal("100"), Decimal("10000"))
+        fees = strategy.after_initialize(Decimal("100"), Decimal("10000"))
         assert fees.bid_fee == Decimal("0.003")
         assert fees.ask_fee == Decimal("0.003")
 
-    def test_strategy_on_trade_returns_same_fees(self):
-        """Verify onTrade returns same 30 bps fees."""
+    def test_strategy_after_swap_returns_same_fees(self):
+        """Verify afterSwap returns same 30 bps fees."""
         strategy = load_vanilla_strategy()
-        strategy.initialize(Decimal("100"), Decimal("10000"))
+        strategy.after_initialize(Decimal("100"), Decimal("10000"))
 
         trade = TradeInfo(
             side="buy",
@@ -69,7 +69,7 @@ class TestLoadVanillaStrategy:
             reserve_y=Decimal("9100"),
         )
 
-        fees = strategy.on_trade(trade)
+        fees = strategy.after_swap(trade)
         assert fees.bid_fee == Decimal("0.003")
         assert fees.ask_fee == Decimal("0.003")
 
@@ -83,9 +83,9 @@ class TestLoadVanillaStrategy:
     def test_strategy_can_reset(self):
         """Verify strategy reset works."""
         strategy = load_vanilla_strategy()
-        strategy.initialize(Decimal("100"), Decimal("10000"))
+        strategy.after_initialize(Decimal("100"), Decimal("10000"))
         # Should not raise
         strategy.reset()
         # Can reinitialize after reset
-        fees = strategy.initialize(Decimal("200"), Decimal("20000"))
+        fees = strategy.after_initialize(Decimal("200"), Decimal("20000"))
         assert fees.bid_fee == Decimal("0.003")

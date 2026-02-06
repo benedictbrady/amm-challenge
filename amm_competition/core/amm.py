@@ -35,10 +35,10 @@ class AMM:
     name: str = ""
     current_fees: FeeQuote = field(init=False)
     _initialized: bool = field(default=False, init=False)
-    # Performance optimization: batch on_trade calls
+    # Performance optimization: batch after_swap calls
     _pending_trade: Optional[TradeInfo] = field(default=None, init=False)
     _trade_count: int = field(default=0, init=False)
-    # Only call on_trade every N trades (0 = every trade, higher = less frequent)
+    # Only call after_swap every N trades (0 = every trade, higher = less frequent)
     fee_update_interval: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
@@ -47,7 +47,7 @@ class AMM:
 
     def initialize(self) -> None:
         """Initialize the AMM and get starting fees from strategy."""
-        self.current_fees = self.strategy.initialize(self.reserve_x, self.reserve_y)
+        self.current_fees = self.strategy.after_initialize(self.reserve_x, self.reserve_y)
         self._initialized = True
         self._trade_count = 0
         self._pending_trade = None
@@ -59,7 +59,7 @@ class AMM:
     def flush(self) -> None:
         """Force a fee update if there's a pending trade."""
         if self._pending_trade is not None:
-            self.current_fees = self.strategy.on_trade(self._pending_trade)
+            self.current_fees = self.strategy.after_swap(self._pending_trade)
             self._pending_trade = None
 
     def _maybe_update_fees(self, trade_info: TradeInfo) -> None:
@@ -69,11 +69,11 @@ class AMM:
 
         if self.fee_update_interval == 0:
             # Update every trade (original behavior)
-            self.current_fees = self.strategy.on_trade(trade_info)
+            self.current_fees = self.strategy.after_swap(trade_info)
             self._pending_trade = None
         elif self._trade_count % self.fee_update_interval == 0:
             # Update every Nth trade
-            self.current_fees = self.strategy.on_trade(trade_info)
+            self.current_fees = self.strategy.after_swap(trade_info)
             self._pending_trade = None
         # Otherwise, defer the update
 

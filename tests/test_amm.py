@@ -11,10 +11,10 @@ from amm_competition.core.trade import FeeQuote, TradeInfo
 class ZeroFeeStrategy(AMMStrategy):
     """Minimal zero-fee strategy for testing fee-less behavior."""
 
-    def initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
+    def after_initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
         return FeeQuote.symmetric(Decimal("0"))
 
-    def on_trade(self, trade: TradeInfo) -> FeeQuote:
+    def after_swap(self, trade: TradeInfo) -> FeeQuote:
         return FeeQuote.symmetric(Decimal("0"))
 
     def get_name(self) -> str:
@@ -168,13 +168,13 @@ class TestAMM:
 
 class TestVanillaStrategy:
     def test_fixed_fees(self, vanilla_strategy):
-        fees = vanilla_strategy.initialize(Decimal("100"), Decimal("10000"))
+        fees = vanilla_strategy.after_initialize(Decimal("100"), Decimal("10000"))
 
         assert fees.bid_fee == Decimal("0.003")
         assert fees.ask_fee == Decimal("0.003")
 
-    def test_fees_unchanged_on_trade(self, vanilla_strategy):
-        vanilla_strategy.initialize(Decimal("100"), Decimal("10000"))
+    def test_fees_unchanged_after_swap(self, vanilla_strategy):
+        vanilla_strategy.after_initialize(Decimal("100"), Decimal("10000"))
 
         trade = TradeInfo(
             side="buy",
@@ -185,7 +185,7 @@ class TestVanillaStrategy:
             reserve_y=Decimal("9100"),
         )
 
-        fees = vanilla_strategy.on_trade(trade)
+        fees = vanilla_strategy.after_swap(trade)
         assert fees.bid_fee == Decimal("0.003")
         assert fees.ask_fee == Decimal("0.003")
 

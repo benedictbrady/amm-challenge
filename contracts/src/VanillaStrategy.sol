@@ -12,12 +12,12 @@ contract VanillaStrategy is AMMStrategyBase {
     uint256 public constant FEE = 30 * BPS;
 
     /// @inheritdoc IAMMStrategy
-    function initialize(uint256, uint256) external pure override returns (uint256 bidFee, uint256 askFee) {
+    function afterInitialize(uint256, uint256) external pure override returns (uint256 bidFee, uint256 askFee) {
         return (FEE, FEE);
     }
 
     /// @inheritdoc IAMMStrategy
-    function onTrade(TradeInfo calldata) external pure override returns (uint256 bidFee, uint256 askFee) {
+    function afterSwap(TradeInfo calldata) external pure override returns (uint256 bidFee, uint256 askFee) {
         return (FEE, FEE);
     }
 

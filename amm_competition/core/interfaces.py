@@ -18,7 +18,7 @@ class AMMStrategy(ABC):
     """
 
     @abstractmethod
-    def initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
+    def after_initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
         """Called once at the start of simulation with initial reserves.
 
         Args:
@@ -31,7 +31,7 @@ class AMMStrategy(ABC):
         pass
 
     @abstractmethod
-    def on_trade(self, trade: TradeInfo) -> FeeQuote:
+    def after_swap(self, trade: TradeInfo) -> FeeQuote:
         """Called after each trade against this AMM.
 
         This is the only callback strategies receive. Use it to update

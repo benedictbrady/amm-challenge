@@ -19,10 +19,10 @@ class FixedFeeStrategy(AMMStrategy):
     def __init__(self, bid_fee: Decimal, ask_fee: Decimal):
         self._fees = FeeQuote(bid_fee=bid_fee, ask_fee=ask_fee)
 
-    def initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
+    def after_initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
         return self._fees
 
-    def on_trade(self, trade: TradeInfo) -> FeeQuote:
+    def after_swap(self, trade: TradeInfo) -> FeeQuote:
         return self._fees
 
 

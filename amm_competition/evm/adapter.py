@@ -53,7 +53,7 @@ class EVMStrategyAdapter(AMMStrategy):
             (self._bytecode, self._abi, self._name_override),
         )
 
-    def initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
+    def after_initialize(self, initial_x: Decimal, initial_y: Decimal) -> FeeQuote:
         """Initialize the strategy with starting reserves.
 
         Args:
@@ -66,17 +66,17 @@ class EVMStrategyAdapter(AMMStrategy):
         Raises:
             RuntimeError: If EVM execution fails
         """
-        result = self._executor.initialize(initial_x, initial_y)
+        result = self._executor.after_initialize(initial_x, initial_y)
 
         if not result.success:
-            raise RuntimeError(f"Strategy initialize() failed: {result.error}")
+            raise RuntimeError(f"Strategy afterInitialize() failed: {result.error}")
 
         self.total_gas_used += result.gas_used
         self.call_count += 1
 
         return FeeQuote(bid_fee=result.bid_fee, ask_fee=result.ask_fee)
 
-    def on_trade(self, trade: TradeInfo) -> FeeQuote:
+    def after_swap(self, trade: TradeInfo) -> FeeQuote:
         """Handle a trade event and return updated fees.
 
         Args:
@@ -89,7 +89,7 @@ class EVMStrategyAdapter(AMMStrategy):
             RuntimeError: If EVM execution fails
         """
         # Use fast path that returns WAD values
-        bid_wad, ask_wad = self._executor.on_trade_fast(trade)
+        bid_wad, ask_wad = self._executor.after_swap_fast(trade)
         self.call_count += 1
 
         # Convert to Decimal only at the boundary
@@ -98,7 +98,7 @@ class EVMStrategyAdapter(AMMStrategy):
             ask_fee=Decimal(ask_wad) / _WAD_DECIMAL,
         )
 
-    def on_trade_wad(self, trade: TradeInfo) -> Tuple[int, int]:
+    def after_swap_wad(self, trade: TradeInfo) -> Tuple[int, int]:
         """Fast path: handle a trade event and return WAD values.
 
         This avoids Decimal conversions for performance-critical paths.
@@ -110,7 +110,7 @@ class EVMStrategyAdapter(AMMStrategy):
             Tuple of (bid_fee_wad, ask_fee_wad) as integers
         """
         self.call_count += 1
-        return self._executor.on_trade_fast(trade)
+        return self._executor.after_swap_fast(trade)
 
     def get_name(self) -> str:
         """Get the strategy name.

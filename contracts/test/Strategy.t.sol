@@ -13,11 +13,11 @@ contract StrategyTest is Test {
         vanilla = new VanillaStrategy();
     }
 
-    function test_VanillaInitialize() public {
+    function test_VanillaAfterInitialize() public {
         uint256 initialX = 100e18;
         uint256 initialY = 10000e18;
 
-        (uint256 bidFee, uint256 askFee) = vanilla.initialize(initialX, initialY);
+        (uint256 bidFee, uint256 askFee) = vanilla.afterInitialize(initialX, initialY);
 
         // 30 bps = 30 * 1e14 = 30e14
         assertEq(bidFee, 30e14, "Bid fee should be 30 bps");
@@ -34,7 +34,7 @@ contract StrategyTest is Test {
             reserveY: 9900e18
         });
 
-        (uint256 bidFee, uint256 askFee) = vanilla.onTrade(trade);
+        (uint256 bidFee, uint256 askFee) = vanilla.afterSwap(trade);
 
         assertEq(bidFee, 30e14, "Bid fee should be 30 bps");
         assertEq(askFee, 30e14, "Ask fee should be 30 bps");
@@ -60,11 +60,11 @@ contract StrategyTest is Test {
 
 /// @notice Test contract to verify helper functions work correctly
 contract HelperFunctionsTest is AMMStrategyBase {
-    function initialize(uint256, uint256) external pure override returns (uint256, uint256) {
+    function afterInitialize(uint256, uint256) external pure override returns (uint256, uint256) {
         return (0, 0);
     }
 
-    function onTrade(TradeInfo calldata) external pure override returns (uint256, uint256) {
+    function afterSwap(TradeInfo calldata) external pure override returns (uint256, uint256) {
         return (0, 0);
     }
 

@@ -19,7 +19,7 @@ class SolidityValidator:
 
     Ensures strategies:
     - Inherit from AMMStrategyBase
-    - Define required functions (initialize, onTrade, getName)
+    - Define required functions (afterInitialize, afterSwap, getName)
     - Don't use dangerous patterns (external calls, assembly, selfdestruct, etc.)
     """
 
@@ -52,15 +52,15 @@ class SolidityValidator:
             r"contract\s+Strategy\s+is\s+AMMStrategyBase",
             "Contract must be named 'Strategy' and inherit from AMMStrategyBase",
         ),
-        # Must implement initialize
+        # Must implement afterInitialize
         (
-            r"function\s+initialize\s*\(",
-            "Must implement initialize(uint256, uint256) function",
+            r"function\s+afterInitialize\s*\(",
+            "Must implement afterInitialize(uint256, uint256) function",
         ),
-        # Must implement onTrade
+        # Must implement afterSwap
         (
-            r"function\s+onTrade\s*\(",
-            "Must implement onTrade(TradeInfo calldata) function",
+            r"function\s+afterSwap\s*\(",
+            "Must implement afterSwap(TradeInfo calldata) function",
         ),
         # Must implement getName
         (

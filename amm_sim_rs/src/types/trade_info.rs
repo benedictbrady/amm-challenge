@@ -39,10 +39,10 @@ impl TradeInfo {
         }
     }
 
-    /// Encode as ABI calldata for onTrade function.
+    /// Encode as ABI calldata for afterSwap function.
     ///
     /// Layout (196 bytes total):
-    /// - bytes 0-3: function selector (0x5d8b6313)
+    /// - bytes 0-3: function selector (0xc2babb57)
     /// - bytes 4-35: isBuy (bool as uint256)
     /// - bytes 36-67: amountX (uint256)
     /// - bytes 68-99: amountY (uint256)
@@ -51,8 +51,8 @@ impl TradeInfo {
     /// - bytes 164-195: reserveY (uint256)
     #[inline]
     pub fn encode_calldata(&self, buffer: &mut [u8; 196]) {
-        // Function selector for onTrade(TradeInfo)
-        buffer[0..4].copy_from_slice(&[0x5d, 0x8b, 0x63, 0x13]);
+        // Function selector for afterSwap(TradeInfo)
+        buffer[0..4].copy_from_slice(&[0xc2, 0xba, 0xbb, 0x57]);
 
         // isBuy (bool as uint256, value at byte 35)
         buffer[4..36].fill(0);
@@ -85,20 +85,20 @@ impl TradeInfo {
     }
 }
 
-/// Function selector for initialize(uint256,uint256)
-pub const SELECTOR_INITIALIZE: [u8; 4] = [0xe4, 0xa3, 0x01, 0x16];
+/// Function selector for afterInitialize(uint256,uint256)
+pub const SELECTOR_AFTER_INITIALIZE: [u8; 4] = [0x83, 0x7a, 0xef, 0x47];
 
-/// Function selector for onTrade(TradeInfo)
-pub const SELECTOR_ON_TRADE: [u8; 4] = [0x5d, 0x8b, 0x63, 0x13];
+/// Function selector for afterSwap(TradeInfo)
+pub const SELECTOR_AFTER_SWAP: [u8; 4] = [0xc2, 0xba, 0xbb, 0x57];
 
 /// Function selector for getName()
 pub const SELECTOR_GET_NAME: [u8; 4] = [0x17, 0xd7, 0xde, 0x7c];
 
-/// Encode initialize(uint256, uint256) calldata.
+/// Encode afterInitialize(uint256, uint256) calldata.
 #[inline]
-pub fn encode_initialize(initial_x: Wad, initial_y: Wad) -> [u8; 68] {
+pub fn encode_after_initialize(initial_x: Wad, initial_y: Wad) -> [u8; 68] {
     let mut buffer = [0u8; 68];
-    buffer[0..4].copy_from_slice(&SELECTOR_INITIALIZE);
+    buffer[0..4].copy_from_slice(&SELECTOR_AFTER_INITIALIZE);
 
     // initialX
     let x_bytes = (initial_x.raw() as u128).to_be_bytes();
@@ -159,7 +159,7 @@ mod tests {
         trade.encode_calldata(&mut buffer);
 
         // Check selector
-        assert_eq!(&buffer[0..4], &[0x5d, 0x8b, 0x63, 0x13]);
+        assert_eq!(&buffer[0..4], &[0xc2, 0xba, 0xbb, 0x57]);
 
         // Check is_buy
         assert_eq!(buffer[35], 1);
@@ -170,13 +170,13 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_initialize() {
-        let calldata = encode_initialize(
+    fn test_encode_after_initialize() {
+        let calldata = encode_after_initialize(
             Wad::new(WAD * 1000),
             Wad::new(WAD * 1000),
         );
 
-        assert_eq!(&calldata[0..4], &SELECTOR_INITIALIZE);
+        assert_eq!(&calldata[0..4], &SELECTOR_AFTER_INITIALIZE);
         assert_eq!(calldata.len(), 68);
     }
 }

@@ -93,10 +93,10 @@ The normalizer also means there's no "free lunch"—you can't beat 30 bps just b
 
 ```solidity
 contract Strategy is AMMStrategyBase {
-    function initialize(uint256 initialX, uint256 initialY)
+    function afterInitialize(uint256 initialX, uint256 initialY)
         external override returns (uint256 bidFee, uint256 askFee);
 
-    function onTrade(TradeInfo calldata trade)
+    function afterSwap(TradeInfo calldata trade)
         external override returns (uint256 bidFee, uint256 askFee);
 
     function getName() external pure override returns (string memory);
@@ -105,7 +105,7 @@ contract Strategy is AMMStrategyBase {
 
 The core mechanic: **you set a buy fee and a sell fee, and after every trade you can change what fees you're showing the market.**
 
-`initialize` is called once at simulation start — return your opening `(bidFee, askFee)`. Then `onTrade` is called after every trade that hits your AMM. You see what just happened and return updated fees for the next trade.
+`afterInitialize` is called once at simulation start — return your opening `(bidFee, askFee)`. Then `afterSwap` is called after every trade that hits your AMM. You see what just happened and return updated fees for the next trade.
 
 | Field | Description |
 |-------|-------------|
@@ -125,12 +125,12 @@ A simple strategy that bumps fees up after large trades and decays back to a bas
 
 ```solidity
 contract Strategy is AMMStrategyBase {
-    function initialize(uint256, uint256) external override returns (uint256, uint256) {
+    function afterInitialize(uint256, uint256) external override returns (uint256, uint256) {
         slots[0] = bpsToWad(30); // starting fee
         return (bpsToWad(30), bpsToWad(30));
     }
 
-    function onTrade(TradeInfo calldata trade) external override returns (uint256, uint256) {
+    function afterSwap(TradeInfo calldata trade) external override returns (uint256, uint256) {
         uint256 fee = slots[0];
 
         // Large trade relative to reserves? Widen the spread.

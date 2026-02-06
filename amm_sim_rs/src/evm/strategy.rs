@@ -9,7 +9,7 @@ use revm::{
 };
 use thiserror::Error;
 
-use crate::types::trade_info::{encode_initialize, decode_fee_pair, TradeInfo, SELECTOR_GET_NAME};
+use crate::types::trade_info::{encode_after_initialize, decode_fee_pair, TradeInfo, SELECTOR_GET_NAME};
 use crate::types::wad::Wad;
 
 /// Errors that can occur during EVM execution.
@@ -54,7 +54,7 @@ pub struct EVMStrategy {
     bytecode: Vec<u8>,
     /// In-memory database for EVM state
     db: InMemoryDB,
-    /// Pre-allocated calldata buffer for on_trade (196 bytes)
+    /// Pre-allocated calldata buffer for after_swap (196 bytes)
     trade_calldata: [u8; 196],
 }
 
@@ -164,8 +164,8 @@ impl EVMStrategy {
     /// Initialize the strategy with starting reserves.
     ///
     /// Returns (bid_fee, ask_fee) in WAD.
-    pub fn initialize(&mut self, initial_x: Wad, initial_y: Wad) -> Result<(Wad, Wad), EVMError> {
-        let calldata = encode_initialize(initial_x, initial_y);
+    pub fn after_initialize(&mut self, initial_x: Wad, initial_y: Wad) -> Result<(Wad, Wad), EVMError> {
+        let calldata = encode_after_initialize(initial_x, initial_y);
         let result = self.call(&calldata, GAS_LIMIT_INIT)?;
 
         decode_fee_pair(&result)
@@ -176,7 +176,7 @@ impl EVMStrategy {
     ///
     /// Returns (bid_fee, ask_fee) in WAD.
     #[inline]
-    pub fn on_trade(&mut self, trade: &TradeInfo) -> Result<(Wad, Wad), EVMError> {
+    pub fn after_swap(&mut self, trade: &TradeInfo) -> Result<(Wad, Wad), EVMError> {
         // Encode trade info into pre-allocated buffer
         trade.encode_calldata(&mut self.trade_calldata);
 

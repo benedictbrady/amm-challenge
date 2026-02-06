@@ -46,11 +46,11 @@ class EVMStrategyExecutor:
     CALLER_ADDRESS = "0x2000000000000000000000000000000000000002"
 
     # Function selectors (first 4 bytes of keccak256 of function signature)
-    # initialize(uint256,uint256) -> 0xe4a30116
-    # onTrade((bool,uint256,uint256,uint256,uint256,uint256)) -> 0x5d8b6313
+    # afterInitialize(uint256,uint256) -> 0x837aef47
+    # afterSwap((bool,uint256,uint256,uint256,uint256,uint256)) -> 0xc2babb57
     # getName() -> 0x17d7de7c
-    SELECTOR_INITIALIZE = bytes.fromhex("e4a30116")
-    SELECTOR_ON_TRADE = bytes.fromhex("5d8b6313")
+    SELECTOR_AFTER_INITIALIZE = bytes.fromhex("837aef47")
+    SELECTOR_AFTER_SWAP = bytes.fromhex("c2babb57")
     SELECTOR_GET_NAME = bytes.fromhex("17d7de7c")
 
     def __init__(self, bytecode: bytes, abi: Optional[list] = None):
@@ -65,9 +65,9 @@ class EVMStrategyExecutor:
         self.evm: Optional[EVM] = None
         self.deployed_address: Optional[str] = None
 
-        # Pre-allocated calldata buffer for on_trade (reused across calls)
+        # Pre-allocated calldata buffer for after_swap (reused across calls)
         self._trade_calldata = bytearray(196)
-        self._trade_calldata[0:4] = self.SELECTOR_ON_TRADE
+        self._trade_calldata[0:4] = self.SELECTOR_AFTER_SWAP
 
         self._deploy()
 
@@ -106,8 +106,8 @@ class EVMStrategyExecutor:
         """Convert a WAD value to Decimal."""
         return Decimal(value) / Decimal(self.WAD)
 
-    def initialize(self, initial_x: Decimal, initial_y: Decimal) -> EVMExecutionResult:
-        """Call the strategy's initialize function.
+    def after_initialize(self, initial_x: Decimal, initial_y: Decimal) -> EVMExecutionResult:
+        """Call the strategy's afterInitialize function.
 
         Args:
             initial_x: Starting X reserve amount
@@ -122,7 +122,7 @@ class EVMStrategyExecutor:
 
         # Encode calldata: selector + initialX + initialY
         calldata = (
-            self.SELECTOR_INITIALIZE + self._encode_uint256(x_wad) + self._encode_uint256(y_wad)
+            self.SELECTOR_AFTER_INITIALIZE + self._encode_uint256(x_wad) + self._encode_uint256(y_wad)
         )
 
         try:
@@ -168,8 +168,8 @@ class EVMStrategyExecutor:
                 error=str(e),
             )
 
-    def on_trade_fast(self, trade: TradeInfo) -> Tuple[int, int]:
-        """Fast path: call onTrade and return raw WAD values.
+    def after_swap_fast(self, trade: TradeInfo) -> Tuple[int, int]:
+        """Fast path: call afterSwap and return raw WAD values.
 
         Returns:
             Tuple of (bid_fee_wad, ask_fee_wad) as integers.
@@ -225,10 +225,10 @@ class EVMStrategyExecutor:
         except Exception:
             return (0, 0)
 
-    def on_trade(self, trade: TradeInfo) -> EVMExecutionResult:
-        """Call the strategy's onTrade function."""
+    def after_swap(self, trade: TradeInfo) -> EVMExecutionResult:
+        """Call the strategy's afterSwap function."""
         # Use fast path and convert to Decimal
-        bid_wad, ask_wad = self.on_trade_fast(trade)
+        bid_wad, ask_wad = self.after_swap_fast(trade)
 
         if bid_wad == 0 and ask_wad == 0:
             # Could be an error or actual zero fees - check by calling again
