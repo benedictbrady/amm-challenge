@@ -23,7 +23,7 @@ Your strategy competes against a **normalizer AMM** running fixed 30 bps fees. B
 The fair price follows GBM: `dS = μSdt + σSdW`
 
 - Drift `μ = 0` (no directional bias)
-- Volatility `σ ~ U[0.95%, 1.15%]` per step (varies across simulations)
+- Volatility `σ ~ U[1.40%, 1.60%]` per step (varies across simulations)
 - Time step `dt = 1/252`
 
 ### Retail Flow
@@ -31,7 +31,7 @@ The fair price follows GBM: `dS = μSdt + σSdW`
 Uninformed traders arrive via Poisson process:
 
 - Arrival rate `λ ~ U[0.6, 1.0]` orders per step
-- Order size `~ LogNormal(μ, σ=1.2)` with mean `~ U[18, 20]` in Y terms
+- Order size `~ LogNormal(μ, σ=1.2)` with mean `~ U[19, 21]` in Y terms
 - Direction: 50% buy, 50% sell
 
 Retail flow splits optimally between AMMs based on fees—lower fees attract more volume.

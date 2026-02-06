@@ -36,14 +36,14 @@ BASELINE_SETTINGS = BaselineSimulationSettings(
 
 
 BASELINE_VARIANCE = HyperparameterVariance(
-    retail_mean_size_min=18.0,
-    retail_mean_size_max=20.0,
+    retail_mean_size_min=19.0,
+    retail_mean_size_max=21.0,
     vary_retail_mean_size=True,
     retail_arrival_rate_min=0.6,
     retail_arrival_rate_max=1.0,
     vary_retail_arrival_rate=True,
-    gbm_sigma_min=0.0095,
-    gbm_sigma_max=0.0115,
+    gbm_sigma_min=0.0140,
+    gbm_sigma_max=0.0160,
     vary_gbm_sigma=True,
 )
 
