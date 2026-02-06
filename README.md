@@ -103,7 +103,9 @@ contract Strategy is AMMStrategyBase {
 }
 ```
 
-`initialize` is called once at simulation start. `onTrade` is called after every trade on your AMM with:
+The core mechanic: **you set a buy fee and a sell fee, and after every trade you can change what fees you're showing the market.**
+
+`initialize` is called once at simulation start — return your opening `(bidFee, askFee)`. Then `onTrade` is called after every trade that hits your AMM. You see what just happened and return updated fees for the next trade.
 
 | Field | Description |
 |-------|-------------|
@@ -116,6 +118,40 @@ contract Strategy is AMMStrategyBase {
 Return fees in WAD: `25 * BPS` = 25 basis points. Max fee is 10%.
 
 You get 32 storage slots (`slots[0..31]`) and helpers like `wmul`, `wdiv`, `sqrt`.
+
+### Example: Widen After Big Trades
+
+A simple strategy that bumps fees up after large trades and decays back to a base fee otherwise:
+
+```solidity
+contract Strategy is AMMStrategyBase {
+    function initialize(uint256, uint256) external override returns (uint256, uint256) {
+        slots[0] = bpsToWad(30); // starting fee
+        return (bpsToWad(30), bpsToWad(30));
+    }
+
+    function onTrade(TradeInfo calldata trade) external override returns (uint256, uint256) {
+        uint256 fee = slots[0];
+
+        // Large trade relative to reserves? Widen the spread.
+        uint256 tradeRatio = wdiv(trade.amountY, trade.reserveY);
+        if (tradeRatio > WAD / 20) { // > 5% of reserves
+            fee = clampFee(fee + bpsToWad(10));
+        } else {
+            // Decay back toward 30 bps
+            uint256 base = bpsToWad(30);
+            if (fee > base) fee = fee - bpsToWad(1);
+        }
+
+        slots[0] = fee;
+        return (fee, fee);
+    }
+
+    function getName() external pure override returns (string memory) {
+        return "Widen After Big Trades";
+    }
+}
+```
 
 ## CLI
 
