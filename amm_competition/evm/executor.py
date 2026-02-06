@@ -32,6 +32,7 @@ class EVMStrategyExecutor:
     """
 
     # Gas limits
+    GAS_LIMIT_DEPLOY = 10_000_000
     GAS_LIMIT_INIT = 250_000
     GAS_LIMIT_TRADE = 250_000
 
@@ -82,6 +83,7 @@ class EVMStrategyExecutor:
             deployer=self.CALLER_ADDRESS,
             code=self.bytecode,
             value=0,
+            gas=self.GAS_LIMIT_DEPLOY,
         )
 
     def _encode_uint256(self, value: int) -> bytes:
@@ -173,7 +175,7 @@ class EVMStrategyExecutor:
 
         Returns:
             Tuple of (bid_fee_wad, ask_fee_wad) as integers.
-            Returns (0, 0) on error.
+            Raises RuntimeError on EVM errors or malformed returns.
         """
         # Reuse pre-allocated calldata buffer
         calldata = self._trade_calldata
@@ -215,32 +217,35 @@ class EVMStrategyExecutor:
             )
 
             if len(result) < 64:
-                return (0, 0)
+                raise RuntimeError(f"Invalid return data length: {len(result)}")
 
             # Decode return values directly as integers
             bid_fee_wad = int.from_bytes(result[0:32], 'big')
             ask_fee_wad = int.from_bytes(result[32:64], 'big')
             return (bid_fee_wad, ask_fee_wad)
 
-        except Exception:
-            return (0, 0)
+        except Exception as e:
+            raise RuntimeError(f"afterSwap failed: {e}") from e
 
     def after_swap(self, trade: TradeInfo) -> EVMExecutionResult:
         """Call the strategy's afterSwap function."""
-        # Use fast path and convert to Decimal
-        bid_wad, ask_wad = self.after_swap_fast(trade)
-
-        if bid_wad == 0 and ask_wad == 0:
-            # Could be an error or actual zero fees - check by calling again
-            # For now, assume success with zero fees is valid
-            pass
-
-        return EVMExecutionResult(
-            bid_fee=Decimal(bid_wad) / _WAD_DECIMAL,
-            ask_fee=Decimal(ask_wad) / _WAD_DECIMAL,
-            gas_used=self.GAS_LIMIT_TRADE // 2,
-            success=True,
-        )
+        try:
+            # Use fast path and convert to Decimal
+            bid_wad, ask_wad = self.after_swap_fast(trade)
+            return EVMExecutionResult(
+                bid_fee=Decimal(bid_wad) / _WAD_DECIMAL,
+                ask_fee=Decimal(ask_wad) / _WAD_DECIMAL,
+                gas_used=self.GAS_LIMIT_TRADE // 2,
+                success=True,
+            )
+        except Exception as e:
+            return EVMExecutionResult(
+                bid_fee=Decimal(0),
+                ask_fee=Decimal(0),
+                gas_used=self.GAS_LIMIT_TRADE,
+                success=False,
+                error=str(e),
+            )
 
     def get_name(self) -> str:
         """Call the strategy's getName function.

@@ -1,6 +1,6 @@
 //! TradeInfo struct and ABI encoding for EVM calls.
 
-use crate::types::wad::Wad;
+use crate::types::wad::{Wad, MAX_FEE};
 
 /// Information about an executed trade, passed to EVM strategies.
 #[derive(Debug, Clone, Copy)]
@@ -121,7 +121,14 @@ pub fn decode_fee_pair(data: &[u8]) -> Option<(Wad, Wad)> {
     let bid_fee = decode_u256(&data[0..32])?;
     let ask_fee = decode_u256(&data[32..64])?;
 
-    Some((Wad::new(bid_fee as i128), Wad::new(ask_fee as i128)))
+    let max_fee_u128 = MAX_FEE as u128;
+    if bid_fee > max_fee_u128 || ask_fee > max_fee_u128 {
+        return None;
+    }
+
+    let bid_i128 = i128::try_from(bid_fee).ok()?;
+    let ask_i128 = i128::try_from(ask_fee).ok()?;
+    Some((Wad::new(bid_i128), Wad::new(ask_i128)))
 }
 
 /// Decode big-endian 32 bytes as u128 (upper 16 bytes must be zero).
@@ -142,7 +149,7 @@ fn decode_u256(data: &[u8]) -> Option<u128> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::wad::WAD;
+    use crate::types::wad::{WAD, MAX_FEE};
 
     #[test]
     fn test_encode_trade_info() {
@@ -178,5 +185,20 @@ mod tests {
 
         assert_eq!(&calldata[0..4], &SELECTOR_AFTER_INITIALIZE);
         assert_eq!(calldata.len(), 68);
+    }
+
+    #[test]
+    fn test_decode_fee_pair_rejects_out_of_range_fee() {
+        let mut data = [0u8; 64];
+
+        // Set bid_fee = MAX_FEE + 1 in low 16 bytes.
+        let bad = (MAX_FEE as u128) + 1;
+        data[16..32].copy_from_slice(&bad.to_be_bytes());
+
+        // Set ask_fee = 30 bps.
+        let ok = (30u128) * 100_000_000_000_000u128;
+        data[48..64].copy_from_slice(&ok.to_be_bytes());
+
+        assert!(decode_fee_pair(&data).is_none());
     }
 }

@@ -28,6 +28,22 @@ class SolidityCompiler:
 
     # Path to the contracts directory with base contracts
     CONTRACTS_DIR = Path(__file__).parent.parent.parent / "contracts"
+    CONTRACTS_SRC_DIR = CONTRACTS_DIR / "src"
+
+    # Opcodes we never allow in user runtime bytecode.
+    FORBIDDEN_OPCODES = {
+        0x31: "BALANCE",
+        0x3B: "EXTCODESIZE",
+        0x3C: "EXTCODECOPY",
+        0x3F: "EXTCODEHASH",
+        0xF0: "CREATE",
+        0xF1: "CALL",
+        0xF2: "CALLCODE",
+        0xF4: "DELEGATECALL",
+        0xF5: "CREATE2",
+        0xFA: "STATICCALL",
+        0xFF: "SELFDESTRUCT",
+    }
 
     def __init__(self):
         """Initialize the compiler and ensure solc is installed."""
@@ -86,7 +102,12 @@ class SolidityCompiler:
                     "evmVersion": "paris",
                     "outputSelection": {
                         "*": {
-                            "*": ["abi", "evm.bytecode.object", "evm.deployedBytecode.object"],
+                            "*": [
+                                "abi",
+                                "evm.bytecode.object",
+                                "evm.deployedBytecode.object",
+                                "storageLayout",
+                            ],
                         },
                     },
                 },
@@ -96,6 +117,8 @@ class SolidityCompiler:
             output = solcx.compile_standard(
                 input_json,
                 solc_version=self.SOLC_VERSION,
+                base_path=str(self.CONTRACTS_SRC_DIR),
+                allow_paths=str(self.CONTRACTS_SRC_DIR),
             )
 
             # Check for errors in output
@@ -144,10 +167,50 @@ class SolidityCompiler:
                     warnings=warnings,
                 )
 
+            creation_bytecode = bytes.fromhex(bytecode_hex)
+            deployed_bytecode = (
+                bytes.fromhex(deployed_bytecode_hex) if deployed_bytecode_hex else b""
+            )
+
+            # Enforce forbidden-opcode policy in creation/init code too.
+            creation_hits = self._scan_forbidden_opcodes(creation_bytecode)
+            if creation_hits:
+                return CompilationResult(
+                    success=False,
+                    errors=[
+                        "Creation bytecode contains forbidden opcodes: "
+                        + ", ".join(creation_hits)
+                    ],
+                    warnings=warnings,
+                )
+
+            # Enforce forbidden-opcode policy directly on deployed runtime code.
+            forbidden_hits = self._scan_forbidden_opcodes(deployed_bytecode)
+            if forbidden_hits:
+                return CompilationResult(
+                    success=False,
+                    errors=[
+                        "Runtime bytecode contains forbidden opcodes: "
+                        + ", ".join(forbidden_hits)
+                    ],
+                    warnings=warnings,
+                )
+
+            # Enforce storage policy from compiler-provided layout.
+            storage_layout = contract_output.get("storageLayout", {})
+            storage_entries = storage_layout.get("storage", [])
+            storage_errors = self._validate_storage_layout(storage_entries)
+            if storage_errors:
+                return CompilationResult(
+                    success=False,
+                    errors=storage_errors,
+                    warnings=warnings,
+                )
+
             return CompilationResult(
                 success=True,
-                bytecode=bytes.fromhex(bytecode_hex),
-                deployed_bytecode=bytes.fromhex(deployed_bytecode_hex) if deployed_bytecode_hex else None,
+                bytecode=creation_bytecode,
+                deployed_bytecode=deployed_bytecode or None,
                 abi=abi,
                 warnings=warnings,
             )
@@ -162,6 +225,55 @@ class SolidityCompiler:
                 success=False,
                 errors=[f"Compilation error: {str(e)}"],
             )
+
+    def _scan_forbidden_opcodes(self, bytecode: bytes) -> list[str]:
+        """Disassemble bytecode and report forbidden opcodes."""
+        if not bytecode:
+            return []
+
+        # Solidity appends CBOR metadata to runtime bytecode.
+        # The final 2 bytes encode metadata length; exclude that region
+        # so static scanning only checks executable runtime instructions.
+        code_len = len(bytecode)
+        if code_len >= 2:
+            metadata_len = int.from_bytes(bytecode[-2:], byteorder="big")
+            if metadata_len + 2 <= code_len:
+                code_len = code_len - metadata_len - 2
+
+        hits: list[str] = []
+        i = 0
+        while i < code_len:
+            op = bytecode[i]
+            name = self.FORBIDDEN_OPCODES.get(op)
+            if name is not None:
+                hits.append(f"{name}@0x{i:x}")
+
+            # PUSH1..PUSH32 contain inline data, skip immediate bytes.
+            if 0x60 <= op <= 0x7F:
+                i += 1 + (op - 0x5F)
+            else:
+                i += 1
+
+        return hits
+
+    def _validate_storage_layout(self, storage_entries: list[dict]) -> list[str]:
+        """Validate strategy storage layout is limited to AMMStrategyBase.slots."""
+        errors: list[str] = []
+        for entry in storage_entries:
+            label = entry.get("label")
+            slot = entry.get("slot")
+            offset = entry.get("offset")
+
+            # The only permitted storage entry is the inherited `slots` array at slot 0.
+            if label == "slots" and str(slot) == "0" and str(offset) == "0":
+                continue
+
+            errors.append(
+                "State storage outside AMMStrategyBase.slots[0..31] is not allowed "
+                f"(found '{label}' at slot {slot}, offset {offset})."
+            )
+
+        return errors
 
     def compile_and_get_bytecode(self, source_code: str) -> tuple[bytes, list]:
         """Convenience method to compile and return bytecode directly.

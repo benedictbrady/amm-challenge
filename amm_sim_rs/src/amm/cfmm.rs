@@ -78,7 +78,7 @@ impl CFMM {
         let initial_y = Wad::from_f64(self.reserve_y);
 
         let (bid_fee, ask_fee) = self.strategy.after_initialize(initial_x, initial_y)?;
-        self.current_fees = FeeQuote::new(bid_fee, ask_fee);
+        self.current_fees = FeeQuote::new(bid_fee.clamp_fee(), ask_fee.clamp_fee());
         self.initialized = true;
 
         Ok(())
@@ -122,7 +122,10 @@ impl CFMM {
         }
 
         let fee = self.current_fees.bid_fee.to_f64();
-        let gamma = 1.0 - fee;
+        let gamma = (1.0 - fee).clamp(0.0, 1.0);
+        if gamma <= 0.0 {
+            return (0.0, 0.0);
+        }
         let net_x = amount_x * gamma;
 
         let k = self.reserve_x * self.reserve_y;
@@ -148,7 +151,10 @@ impl CFMM {
 
         let k = self.reserve_x * self.reserve_y;
         let fee = self.current_fees.ask_fee.to_f64();
-        let gamma = 1.0 - fee;
+        let gamma = (1.0 - fee).clamp(0.0, 1.0);
+        if gamma <= 0.0 {
+            return (0.0, 0.0);
+        }
 
         let new_rx = self.reserve_x - amount_x;
         let new_ry = k / new_rx;
@@ -173,7 +179,10 @@ impl CFMM {
 
         let k = self.reserve_x * self.reserve_y;
         let fee = self.current_fees.ask_fee.to_f64();
-        let gamma = 1.0 - fee;
+        let gamma = (1.0 - fee).clamp(0.0, 1.0);
+        if gamma <= 0.0 {
+            return (0.0, 0.0);
+        }
 
         let net_y = amount_y * gamma;
         let new_ry = self.reserve_y + net_y;
@@ -283,7 +292,7 @@ impl CFMM {
     /// Update fees from strategy after a trade.
     fn update_fees(&mut self, trade_info: &TradeInfo) {
         if let Ok((bid_fee, ask_fee)) = self.strategy.after_swap(trade_info) {
-            self.current_fees = FeeQuote::new(bid_fee, ask_fee);
+            self.current_fees = FeeQuote::new(bid_fee.clamp_fee(), ask_fee.clamp_fee());
         }
         // On error, keep current fees
     }

@@ -42,6 +42,15 @@ class EVMStrategyAdapter(AMMStrategy):
         self.total_gas_used = 0
         self.call_count = 0
 
+    @staticmethod
+    def _clamp_fee_decimal(value: Decimal) -> Decimal:
+        """Clamp strategy fee to [0, 0.1] as defense-in-depth."""
+        if value < Decimal("0"):
+            return Decimal("0")
+        if value > Decimal("0.1"):
+            return Decimal("0.1")
+        return value
+
     def __reduce__(self):
         """Support pickling for multiprocessing.
 
@@ -74,7 +83,10 @@ class EVMStrategyAdapter(AMMStrategy):
         self.total_gas_used += result.gas_used
         self.call_count += 1
 
-        return FeeQuote(bid_fee=result.bid_fee, ask_fee=result.ask_fee)
+        return FeeQuote(
+            bid_fee=self._clamp_fee_decimal(result.bid_fee),
+            ask_fee=self._clamp_fee_decimal(result.ask_fee),
+        )
 
     def after_swap(self, trade: TradeInfo) -> FeeQuote:
         """Handle a trade event and return updated fees.
@@ -94,8 +106,8 @@ class EVMStrategyAdapter(AMMStrategy):
 
         # Convert to Decimal only at the boundary
         return FeeQuote(
-            bid_fee=Decimal(bid_wad) / _WAD_DECIMAL,
-            ask_fee=Decimal(ask_wad) / _WAD_DECIMAL,
+            bid_fee=self._clamp_fee_decimal(Decimal(bid_wad) / _WAD_DECIMAL),
+            ask_fee=self._clamp_fee_decimal(Decimal(ask_wad) / _WAD_DECIMAL),
         )
 
     def after_swap_wad(self, trade: TradeInfo) -> Tuple[int, int]:

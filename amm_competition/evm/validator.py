@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from typing import Optional
 
 
@@ -26,16 +27,19 @@ class SolidityValidator:
     # Dangerous patterns that are blocked
     BLOCKED_PATTERNS = [
         # External calls
-        (r"\bcall\s*\{", "External calls (call{) are not allowed"),
-        (r"\bdelegatecall\s*\(", "delegatecall is not allowed"),
-        (r"\bstaticcall\s*\(", "staticcall is not allowed"),
+        (r"\.\s*call\s*(?:\{|\()", "External calls are not allowed"),
+        (r"\.\s*delegatecall\s*\(", "delegatecall is not allowed"),
+        (r"\.\s*staticcall\s*\(", "staticcall is not allowed"),
+        (r"\.\s*callcode\s*\(", "callcode is not allowed"),
         # Dangerous operations
         (r"\bselfdestruct\s*\(", "selfdestruct is not allowed"),
         (r"\bsuicide\s*\(", "suicide is not allowed"),
         # Assembly (could bypass restrictions)
-        (r"\bassembly\s*\{", "Inline assembly is not allowed"),
+        (r"\bassembly\b(?:\s*\([^)]*\))?\s*\{", "Inline assembly is not allowed"),
         # Creating other contracts
         (r"\bnew\s+\w+\s*\(", "Creating new contracts is not allowed"),
+        # External code introspection
+        (r"\.\s*code(?:hash)?\b", "Reading code from external addresses is not allowed"),
         # Low-level address calls
         (r"\.transfer\s*\(", "transfer() is not allowed"),
         (r"\.send\s*\(", "send() is not allowed"),
@@ -47,11 +51,6 @@ class SolidityValidator:
 
     # Required patterns
     REQUIRED_PATTERNS = [
-        # Must inherit from AMMStrategyBase
-        (
-            r"contract\s+Strategy\s+is\s+AMMStrategyBase",
-            "Contract must be named 'Strategy' and inherit from AMMStrategyBase",
-        ),
         # Must implement afterInitialize
         (
             r"function\s+afterInitialize\s*\(",
@@ -70,16 +69,16 @@ class SolidityValidator:
     ]
 
     # Allowed imports (only base contracts)
-    ALLOWED_IMPORTS = [
-        r'"./AMMStrategyBase\.sol"',
-        r'"./IAMMStrategy\.sol"',
-        r'"\./AMMStrategyBase\.sol"',
-        r'"\./IAMMStrategy\.sol"',
-        # With curly braces
-        r"\{AMMStrategyBase\}\s+from\s+",
-        r"\{IAMMStrategy,\s*TradeInfo\}\s+from\s+",
-        r"\{TradeInfo\}\s+from\s+",
-    ]
+    ALLOWED_IMPORT_PATHS = {
+        "AMMStrategyBase.sol",
+        "IAMMStrategy.sol",
+    }
+
+    RESERVED_IDENTIFIERS = {
+        "AMMStrategyBase",
+        "IAMMStrategy",
+        "TradeInfo",
+    }
 
     def validate(self, source_code: str) -> ValidationResult:
         """Validate Solidity source code.
@@ -92,9 +91,11 @@ class SolidityValidator:
         """
         errors: list[str] = []
         warnings: list[str] = []
+        analysis_source = self._preprocess_source(source_code, strip_strings=True)
+        import_source = self._preprocess_source(source_code, strip_strings=False)
 
         # Check for required pragma
-        if not re.search(r"pragma\s+solidity\s+", source_code):
+        if not re.search(r"pragma\s+solidity\s+", analysis_source):
             errors.append("Missing pragma solidity directive")
 
         # Check SPDX license identifier (warning only)
@@ -103,20 +104,27 @@ class SolidityValidator:
 
         # Check for blocked patterns
         for pattern, message in self.BLOCKED_PATTERNS:
-            if re.search(pattern, source_code, re.IGNORECASE):
+            if re.search(pattern, analysis_source, re.IGNORECASE):
                 errors.append(message)
+
+        contract_errors = self._validate_contract_declaration(analysis_source)
+        errors.extend(contract_errors)
 
         # Check for required patterns
         for pattern, message in self.REQUIRED_PATTERNS:
-            if not re.search(pattern, source_code):
+            if not re.search(pattern, analysis_source):
                 errors.append(message)
 
         # Validate imports
-        import_errors = self._validate_imports(source_code)
+        import_errors = self._validate_imports(import_source)
         errors.extend(import_errors)
 
+        # Prevent shadowing core interface/base names
+        redeclaration_errors = self._check_reserved_redeclarations(import_source)
+        errors.extend(redeclaration_errors)
+
         # Check for storage outside of slots array
-        storage_warnings = self._check_storage_usage(source_code)
+        storage_warnings = self._check_storage_usage(import_source)
         warnings.extend(storage_warnings)
 
         return ValidationResult(
@@ -124,6 +132,47 @@ class SolidityValidator:
             errors=errors,
             warnings=warnings,
         )
+
+    def _preprocess_source(self, source_code: str, *, strip_strings: bool) -> str:
+        """Strip comments and string literals before structural regex checks."""
+        # Remove multiline comments first
+        source = re.sub(r"/\*[\s\S]*?\*/", "", source_code)
+        # Remove single-line comments
+        source = re.sub(r"//.*?$", "", source, flags=re.MULTILINE)
+        if strip_strings:
+            # Remove string/char literals so blocked/required patterns
+            # cannot be satisfied by quoted text.
+            source = re.sub(r'"(?:\\.|[^"\\])*"', '""', source)
+            source = re.sub(r"'(?:\\.|[^'\\])*'", "''", source)
+        return source
+
+    def _validate_contract_declaration(self, source_code: str) -> list[str]:
+        """Require `contract Strategy is ...` with AMMStrategyBase in inheritance list."""
+        errors = []
+        contract_match = re.search(r"\bcontract\s+Strategy\s+is\s+([^{}]+)\{", source_code)
+        if not contract_match:
+            errors.append(
+                "Contract must be named 'Strategy' and inherit from AMMStrategyBase"
+            )
+            return errors
+
+        base_list = contract_match.group(1)
+        base_names = []
+        for base in base_list.split(","):
+            cleaned = base.strip()
+            if not cleaned:
+                continue
+            # Keep only the base contract/interface identifier
+            name_match = re.match(r"([A-Za-z_]\w*)", cleaned)
+            if name_match:
+                base_names.append(name_match.group(1))
+
+        if "AMMStrategyBase" not in base_names:
+            errors.append(
+                "Contract must be named 'Strategy' and inherit from AMMStrategyBase"
+            )
+
+        return errors
 
     def _validate_imports(self, source_code: str) -> list[str]:
         """Validate that only allowed imports are used.
@@ -140,24 +189,72 @@ class SolidityValidator:
         import_pattern = r'import\s+(?:[\{][\w\s,]+[\}]\s+from\s+)?["\']([^"\']+)["\']'
         imports = re.findall(import_pattern, source_code)
 
+        if not imports:
+            errors.append(
+                "Missing required imports. "
+                "Only './AMMStrategyBase.sol' and './IAMMStrategy.sol' are allowed."
+            )
+            return errors
+
+        seen = set()
         for import_path in imports:
-            # Check if this import is allowed
-            allowed = False
-            for allowed_pattern in self.ALLOWED_IMPORTS:
-                if re.search(allowed_pattern, f'"{import_path}"'):
-                    allowed = True
-                    break
+            normalized = self._normalize_import_path(import_path)
+            if normalized is None or normalized not in self.ALLOWED_IMPORT_PATHS:
+                errors.append(
+                    f"Import '{import_path}' is not allowed. "
+                    "Only './AMMStrategyBase.sol' and './IAMMStrategy.sol' are allowed."
+                )
+                continue
+            seen.add(normalized)
 
-            if not allowed:
-                # Check if it's importing from the base contracts
-                if "AMMStrategyBase" in import_path or "IAMMStrategy" in import_path:
-                    allowed = True
-                else:
-                    errors.append(
-                        f"Import '{import_path}' is not allowed. "
-                        "Only AMMStrategyBase and IAMMStrategy can be imported."
-                    )
+        missing = self.ALLOWED_IMPORT_PATHS - seen
+        if missing:
+            errors.append(
+                "Missing required base imports: "
+                + ", ".join(sorted(f"'./{path}'" for path in missing))
+            )
 
+        return errors
+
+    def _normalize_import_path(self, import_path: str) -> Optional[str]:
+        """Normalize and validate a Solidity import path.
+
+        Returns:
+            Canonical path string if safe, otherwise None.
+        """
+        if not import_path or "\\" in import_path:
+            return None
+
+        if import_path.startswith("/"):
+            return None
+
+        raw = PurePosixPath(import_path)
+        parts = list(raw.parts)
+        if not parts:
+            return None
+
+        filename = parts[-1]
+        if not filename:
+            return None
+
+        # Allow only relative prefixes made of "." / ".." before filename.
+        # This supports templates located in nested folders (e.g. ../AMMStrategyBase.sol)
+        # while still restricting imports to the two allowed base files.
+        for part in parts[:-1]:
+            if part not in ("", ".", ".."):
+                return None
+
+        return filename
+
+    def _check_reserved_redeclarations(self, source_code: str) -> list[str]:
+        """Reject user source that redefines reserved base/interface names."""
+        errors = []
+        pattern = r"\b(contract|interface|library|struct|enum)\s+([A-Za-z_]\w*)\b"
+        for _, name in re.findall(pattern, source_code):
+            if name in self.RESERVED_IDENTIFIERS:
+                errors.append(
+                    f"Redefining reserved identifier '{name}' is not allowed."
+                )
         return errors
 
     def _check_storage_usage(self, source_code: str) -> list[str]:
@@ -181,7 +278,7 @@ class SolidityValidator:
         state_var_pattern = r"^\s*(uint\d*|int\d*|bool|address|bytes\d*|string|mapping\s*\([^)]+\))\s+(?!constant|immutable)(\w+)\s*[;=]"
 
         # Find the contract body
-        contract_match = re.search(r"contract\s+Strategy\s+is\s+AMMStrategyBase\s*\{", source_code)
+        contract_match = re.search(r"contract\s+Strategy\s+is\s+[^{}]+\{", source_code)
         if contract_match:
             # Get content after contract declaration
             contract_body = source_code[contract_match.end() :]
