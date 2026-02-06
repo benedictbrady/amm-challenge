@@ -3,7 +3,7 @@
 use revm::{
     primitives::{
         Address, Bytes, ExecutionResult, Output, U256,
-        AccountInfo, Bytecode, TxKind,
+        AccountInfo, Bytecode, TxKind, SpecId,
     },
     Evm, InMemoryDB,
 };
@@ -92,6 +92,7 @@ impl EVMStrategy {
         let deployed_code = {
             let mut evm = Evm::builder()
                 .with_db(&mut self.db)
+                .with_spec_id(SpecId::CANCUN)
                 .modify_tx_env(|tx| {
                     tx.caller = CALLER_ADDRESS;
                     tx.transact_to = TxKind::Create;
@@ -197,6 +198,7 @@ impl EVMStrategy {
     fn call(&mut self, calldata: &[u8], gas_limit: u64) -> Result<Vec<u8>, EVMError> {
         let mut evm = Evm::builder()
             .with_db(&mut self.db)
+            .with_spec_id(SpecId::CANCUN)
             .modify_tx_env(|tx| {
                 tx.caller = CALLER_ADDRESS;
                 tx.transact_to = TxKind::Call(STRATEGY_ADDRESS);
