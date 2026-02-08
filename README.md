@@ -186,3 +186,20 @@ amm-match validate my_strategy.sol
 ```
 
 Output is your average edge across simulations. The 30 bps normalizer typically scores around 250-350 edge depending on market conditions.
+
+## Strategy Visualizer
+
+An interactive starter-strategy visualizer is available in `visualizer/`.
+
+- Left panel: strategy Solidity code with active line highlights
+- Right panel: reserve-curve market simulation and trade tape
+- Step-by-step explanations that map each trade to strategy behavior
+
+Run locally:
+
+```bash
+cd visualizer
+python3 -m http.server 8080
+```
+
+Then open `http://localhost:8080`.

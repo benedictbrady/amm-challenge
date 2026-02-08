@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AMM Starter Strategy Visualizer</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="backdrop"></div>
+  <div class="app-shell">
+    <header class="topbar reveal">
+      <div>
+        <h1>AMM Starter Strategy Visualizer</h1>
+        <p>Code on the left, live market on the right. Step through every trade.</p>
+      </div>
+
+      <div class="controls">
+        <label class="control">
+          <span>Strategy</span>
+          <select id="strategySelect"></select>
+        </label>
+
+        <label class="control speed-control">
+          <span>Speed</span>
+          <div class="speed-inner">
+            <input id="speedRange" type="range" min="1" max="6" step="1" value="3" />
+            <strong id="speedLabel">1.0x</strong>
+          </div>
+        </label>
+
+        <div class="button-row">
+          <button id="playBtn" type="button">Play</button>
+          <button id="stepBtn" type="button">Step</button>
+          <button id="resetBtn" type="button">Reset</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel code-panel reveal delay-1">
+        <div class="panel-head">
+          <h2>Strategy Code</h2>
+          <span id="strategyStateBadge" class="badge">-</span>
+        </div>
+
+        <div id="codeView" class="code-view" aria-label="Strategy code"></div>
+
+        <div class="explain-box">
+          <h3>What the code just did</h3>
+          <p id="codeExplanation">Press Step to begin the simulation.</p>
+        </div>
+      </section>
+
+      <section class="panel market-panel reveal delay-2">
+        <div class="panel-head">
+          <h2>Simulated Market</h2>
+          <span id="clockLabel" class="clock">Step 0 | Trade 0</span>
+        </div>
+
+        <div class="chart-wrap">
+          <svg id="curveChart" viewBox="0 0 760 440" role="img" aria-label="AMM reserve curve chart"></svg>
+        </div>
+
+        <div class="metrics">
+          <div class="metric-card">
+            <span>Fair Price</span>
+            <strong id="fairPriceMetric">-</strong>
+          </div>
+          <div class="metric-card">
+            <span>Strategy Spot</span>
+            <strong id="strategySpotMetric">-</strong>
+          </div>
+          <div class="metric-card">
+            <span>Strategy Fees</span>
+            <strong id="feesMetric">-</strong>
+          </div>
+          <div class="metric-card">
+            <span>Cumulative Edge</span>
+            <strong id="edgeMetric">-</strong>
+          </div>
+        </div>
+
+        <div class="trade-section">
+          <h3>Trade Tape</h3>
+          <ul id="tradeTape" class="trade-tape"></ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>
